@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building Plan Generator</title>
+<style>
+  :root {
+    --primary: #1a3c5e;
+    --accent: #e67e22;
+    --light: #f4f6f9;
+    --border: #d0d7e2;
+    --text: #2c3e50;
+    --muted: #7f8c8d;
+    --success: #27ae60;
+    --warn: #f39c12;
+    --danger: #e74c3c;
+    --low: #3498db;
+    --med: #e67e22;
+    --high: #8e44ad;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--light); color: var(--text); font-size: 14px; }
+  header { background: var(--primary); color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 14px; }
+  header h1 { font-size: 1.5rem; font-weight: 700; }
+  header span { font-size: 0.85rem; opacity: 0.75; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+  /* FORM */
+  .form-card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 28px 32px; margin-bottom: 28px; }
+  .form-card h2 { font-size: 1.1rem; color: var(--primary); margin-bottom: 20px; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-weight: 600; font-size: 0.82rem; color: var(--primary); }
+  .form-group label .req { color: var(--danger); }
+  .form-group label .opt { color: var(--muted); font-weight: 400; }
+  .form-group input, .form-group select { border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 0.9rem; transition: border .2s; }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
+  .form-group .hint { font-size: 0.75rem; color: var(--muted); }
+  .error-msg { color: var(--danger); font-size: 0.78rem; margin-top: 2px; display: none; }
+  .form-group.has-error input, .form-group.has-error select { border-color: var(--danger); }
+  .form-group.has-error .error-msg { display: block; }
+  .btn-row { margin-top: 22px; display: flex; gap: 12px; align-items: center; }
+  .btn { padding: 10px 26px; border: none; border-radius: 6px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity .2s; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn:hover { opacity: 0.88; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* NAV */
+  #nav-bar { background: var(--primary); border-radius: 8px; padding: 10px 16px; margin-bottom: 20px; display: none; flex-wrap: wrap; gap: 6px; }
+  #nav-bar a { color: #cde; font-size: 0.8rem; text-decoration: none; padding: 4px 10px; border-radius: 4px; background: rgba(255,255,255,.1); }
+  #nav-bar a:hover { background: rgba(255,255,255,.25); }
+
+  /* ASSUMPTIONS BANNER */
+  #assumptions-banner { background: #fff8e1; border-left: 4px solid var(--warn); border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; display: none; }
+  #assumptions-banner h3 { color: var(--warn); font-size: 0.9rem; margin-bottom: 8px; }
+  #assumptions-banner ul { padding-left: 18px; font-size: 0.85rem; }
+
+  /* DISCLAIMER */
+  #disclaimer { background: #fdecea; border-left: 4px solid var(--danger); border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.8rem; color: #7b241c; display: none; }
+
+  /* SECTIONS */
+  .section { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.07); margin-bottom: 22px; overflow: hidden; display: none; }
+  .section-header { background: var(--primary); color: #fff; padding: 12px 20px; display: flex; align-items: center; gap: 10px; }
+  .section-header .icon { font-size: 1.2rem; }
+  .section-header h2 { font-size: 1rem; font-weight: 700; }
+  .section-body { padding: 20px; }
+
+  /* TABLES */
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
+  th { background: var(--primary); color: #fff; padding: 8px 12px; text-align: left; }
+  td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #f8f9fb; }
+  .highlight-row td { background: #fff3cd !important; font-weight: 700; }
+
+  /* BUDGET TABS */
+  .tier-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tier-tab { padding: 6px 18px; border-radius: 20px; border: 2px solid var(--border); cursor: pointer; font-size: 0.82rem; font-weight: 600; background: #fff; }
+  .tier-tab.low.active { background: var(--low); color: #fff; border-color: var(--low); }
+  .tier-tab.med.active { background: var(--med); color: #fff; border-color: var(--med); }
+  .tier-tab.high.active { background: var(--high); color: #fff; border-color: var(--high); }
+  .tier-tab.low { color: var(--low); border-color: var(--low); }
+  .tier-tab.med { color: var(--med); border-color: var(--med); }
+  .tier-tab.high { color: var(--high); border-color: var(--high); }
+  .tier-panel { display: none; }
+  .tier-panel.active { display: block; }
+  .recommended-badge { background: var(--success); color: #fff; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+
+  /* ASCII */
+  .ascii-box { background: #1e1e2e; color: #a8ff78; font-family: 'Courier New', monospace; font-size: 0.78rem; padding: 16px; border-radius: 8px; overflow-x: auto; white-space: pre; line-height: 1.4; margin-top: 10px; }
+
+  /* CARDS GRID */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 10px; }
+  .card { border: 1.5px solid var(--border); border-radius: 8px; padding: 14px; }
+  .card h4 { color: var(--primary); font-size: 0.88rem; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+  .card p, .card li { font-size: 0.82rem; line-height: 1.6; }
+  .card ul { padding-left: 16px; }
+
+  /* STAT BOXES */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 10px; }
+  .stat-box { background: var(--light); border-radius: 8px; padding: 14px; text-align: center; border: 1.5px solid var(--border); }
+  .stat-box .val { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
+  .stat-box .lbl { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
+
+  /* TIMELINE */
+  .timeline { margin-top: 12px; }
+  .tl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .tl-label { width: 160px; font-size: 0.82rem; font-weight: 600; flex-shrink: 0; }
+  .tl-bar-wrap { flex: 1; background: #e8ecf0; border-radius: 4px; height: 22px; position: relative; }
+  .tl-bar { height: 100%; border-radius: 4px; background: var(--primary); display: flex; align-items: center; padding-left: 8px; color: #fff; font-size: 0.72rem; font-weight: 600; min-width: 30px; }
+  .tl-weeks { width: 80px; font-size: 0.78rem; color: var(--muted); text-align: right; flex-shrink: 0; }
+
+  /* OPTIMIZATION */
+  .opt-list { list-style: none; margin-top: 10px; }
+  .opt-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .opt-list li:last-child { border-bottom: none; }
+  .opt-badge { padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+  .badge-cost { background: #d5f5e3; color: #1e8449; }
+  .badge-space { background: #d6eaf8; color: #1a5276; }
+  .badge-energy { background: #fdebd0; color: #784212; }
+
+  /* INTERIOR */
+  .room-card { border: 1.5px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+  .room-card h4 { color: var(--primary); font-size: 0.9rem; margin-bottom: 10px; }
+  .room-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.82rem; }
+  .room-details .lbl { font-weight: 600; color: var(--muted); }
+  .color-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid #ccc; vertical-align: middle; margin-right: 4px; }
+
+  /* PRINT */
+  #print-btn { display: none; }
+  @media print {
+    header, #input-section, #nav-bar, #print-btn, .btn-row { display: none !important; }
+    .section { display: block !important; box-shadow: none; }
+    #assumptions-banner, #disclaimer { display: block !important; }
+  }
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .room-details { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🏗️ Building Plan Generator</h1>
+    <span>Professional Civil Engineering &amp; Architecture Tool</span>
+  </div>
+</header>
+
+<div class="container">
+  <!-- INPUT FORM -->
+  <div class="form-card" id="input-section">
+    <h2>📋 Project Input Parameters</h2>
+    <div class="form-grid">
+      <div class="form-group" id="fg-width">
+        <label>Plot Width (m) <span class="req">*</span></label>
+        <input type="number" id="plotWidth" placeholder="e.g. 10" min="3" max="500" step="0.1">
+        <span class="hint">Range: 3 – 500 m</span>
+        <span class="error-msg" id="err-width"></span>
+      </div>
+      <div class="form-group" id="fg-length">
+        <label>Plot Length (m) <span class="req">*</span></label>
+        <input type="number" id="plotLength" placeholder="e.g. 15" min="3" max="500" step="0.1">
+        <span class="hint">Range: 3 – 500 m</span>
+        <span class="error-msg" id="err-length"></span>
+      </div>
+      <div class="form-group" id="fg-location">
+        <label>Location (City/Region) <span class="req">*</span></label>
+        <input type="text" id="location" placeholder="e.g. Mumbai, India">
+        <span class="error-msg" id="err-location"></span>
+      </div>
+      <div class="form-group" id="fg-floors">
+        <label>Number of Floors <span class="req">*</span></label>
+        <input type="number" id="floors" placeholder="e.g. 2" min="1" max="20" step="1">
+        <span class="hint">Range: 1 – 20</span>
+        <span class="error-msg" id="err-floors"></span>
+      </div>
+      <div class="form-group" id="fg-type">
+        <label>Building Type <span class="req">*</span></label>
+        <select id="buildingType">
+          <option value="">-- Select --</option>
+          <option value="residential">Residential</option>
+          <option value="commercial">Commercial</option>
+        </select>
+        <span class="error-msg" id="err-type"></span>
+      </div>
+      <div class="form-group">
+        <label>Budget Range <span class="opt">(optional)</span></label>
+        <select id="budget">
+          <option value="">-- Not specified --</option>
+          <option value="low">Low Budget</option>
+          <option value="medium">Medium Budget</option>
+          <option value="high">High Budget</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Vastu Compliance <span class="opt">(optional)</span></label>
+        <select id="vastu">
+          <option value="">-- Not specified --</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Parking Required <span class="opt">(optional)</span></label>
+        <select id="parking">
+          <option value="">-- Not specified --</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="generate()">⚙️ Generate Building Plan</button>
+      <button class="btn btn-accent" onclick="resetForm()">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- ASSUMPTIONS BANNER -->
+  <div id="assumptions-banner">
+    <h3>⚠️ Assumed Values Applied</h3>
+    <ul id="assumptions-list"></ul>
+  </div>
+
+  <!-- DISCLAIMER -->
+  <div id="disclaimer">
+    ⚠️ <strong>Disclaimer:</strong> All outputs are indicative estimates generated by an AI-based tool. They must be reviewed and certified by licensed civil engineers, architects, and structural designers before use in actual construction. Do not use these outputs as a substitute for professional advice.
+  </div>
+
+  <!-- NAV BAR -->
+  <div id="nav-bar">
+    <a href="#sec-site">1. Site Analysis</a>
+    <a href="#sec-floor">2. Floor Plans</a>
+    <a href="#sec-sketch">3. Building Sketch</a>
+    <a href="#sec-elevation">4. Elevation</a>
+    <a href="#sec-structural">5. Structural</a>
+    <a href="#sec-cost">6. Cost Estimate</a>
+    <a href="#sec-interior">7. Interior Design</a>
+    <a href="#sec-boq">8. BOQ Summary</a>
+    <a href="#sec-timeline">9. Timeline</a>
+    <a href="#sec-optimization">10. Optimization</a>
+  </div>
+
+  <!-- SECTIONS -->
+  <div class="section" id="sec-site">
+    <div class="section-header"><span class="icon">📐</span><h2>1. Site Analysis</h2></div>
+    <div class="section-body" id="body-site"></div>
+  </div>
+
+  <div class="section" id="sec-floor">
+    <div class="section-header"><span class="icon">🗺️</span><h2>2. Floor Plans</h2></div>
+    <div class="section-body" id="body-floor"></div>
+  </div>
+
+  <div class="section" id="sec-sketch">
+    <div class="section-header"><span class="icon">✏️</span><h2>3. Building Sketch Description</h2></div>
+    <div class="section-body" id="body-sketch"></div>
+  </div>
+
+  <div class="section" id="sec-elevation">
+    <div class="section-header"><span class="icon">🏛️</span><h2>4. 3D Elevation Concept</h2></div>
+    <div class="section-body" id="body-elevation"></div>
+  </div>
+
+  <div class="section" id="sec-structural">
+    <div class="section-header"><span class="icon">🔩</span><h2>5. Structural Design Overview</h2></div>
+    <div class="section-body" id="body-structural"></div>
+  </div>
+
+  <div class="section" id="sec-cost">
+    <div class="section-header"><span class="icon">💰</span><h2>6. Cost Estimation</h2></div>
+    <div class="section-body" id="body-cost"></div>
+  </div>
+
+  <div class="section" id="sec-interior">
+    <div class="section-header"><span class="icon">🛋️</span><h2>7. Interior Design Plan</h2></div>
+    <div class="section-body" id="body-interior"></div>
+  </div>
+
+  <div class="section" id="sec-boq">
+    <div class="section-header"><span class="icon">📦</span><h2>8. Material List (BOQ Summary)</h2></div>
+    <div class="section-body" id="body-boq"></div>
+  </div>
+
+  <div class="section" id="sec-timeline">
+    <div class="section-header"><span class="icon">📅</span><h2>9. Construction Timeline</h2></div>
+    <div class="section-body" id="body-timeline"></div>
+  </div>
+
+  <div class="section" id="sec-optimization">
+    <div class="section-header"><span class="icon">💡</span><h2>10. Optimization Suggestions</h2></div>
+    <div class="section-body" id="body-optimization"></div>
+  </div>
+
+  <div id="print-btn" style="text-align:center;margin:20px 0;">
+    <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  </div>
+</div>
+
+<script>
+// ─── UTILITIES ───────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = (n, dec=0) => Number(n).toLocaleString('en-IN', {maximumFractionDigits: dec});
+const fmtC = (n, sym) => sym + fmt(Math.round(n));
+
+// Currency map by location keyword
+function getCurrency(loc) {
+  const l = loc.toLowerCase();
+  if (/india|mumbai|delhi|bangalore|chennai|hyderabad|pune|kolkata|ahmedabad/.test(l)) return {sym:'₹', name:'INR', basis:'Indian Standard Rates (2024)'};
+  if (/usa|united states|new york|los angeles|chicago|houston/.test(l)) return {sym:'$', name:'USD', basis:'US Market Rates (2024)'};
+  if (/uk|united kingdom|london|manchester/.test(l)) return {sym:'£', name:'GBP', basis:'UK Market Rates (2024)'};
+  if (/uae|dubai|abu dhabi/.test(l)) return {sym:'AED ', name:'AED', basis:'UAE Market Rates (2024)'};
+  if (/australia|sydney|melbourne/.test(l)) return {sym:'A$', name:'AUD', basis:'Australian Market Rates (2024)'};
+  return {sym:'₹', name:'INR', basis:'Indian Standard Rates (2024)'};
+}
+
+// Cost per sqft by tier and currency
+function getCostRates(sym) {
+  const rates = {
+    '₹':  {low:1400, med:2000, high:3200},
+    '$':  {low:80,   med:150,  high:280},
+    '£':  {low:100,  med:180,  high:320},
+    'AED ':{low:300, med:500,  high:900},
+    'A$': {low:120,  med:220,  high:380},
+  };
+  return rates[sym] || rates['₹'];
+}
+
+// ─── VALIDATION ───────────────────────────────────────────────────────────────
+function clearErrors() {
+  ['width','length','location','floors','type'].forEach(f => {
+    $('fg-'+f) && $('fg-'+f).classList.remove('has-error');
+    $('err-'+f) && ($('err-'+f).textContent = '');
+  });
+}
+function setError(field, msg) {
+  $('fg-'+field).classList.add('has-error');
+  $('err-'+field).textContent = msg;
+}
+function validate(inp) {
+  let ok = true;
+  clearErrors();
+  if (!inp.width || inp.width < 3 || inp.width > 500) { setError('width','Required. Must be between 3 and 500 m.'); ok=false; }
+  if (!inp.length || inp.length < 3 || inp.length > 500) { setError('length','Required. Must be between 3 and 500 m.'); ok=false; }
+  if (!inp.location.trim()) { setError('location','Required. Enter a city or region.'); ok=false; }
+  if (!inp.floors || inp.floors < 1 || inp.floors > 20) { setError('floors','Required. Must be between 1 and 20.'); ok=false; }
+  if (!inp.type) { setError('type','Required. Select Residential or Commercial.'); ok=false; }
+  return ok;
+}
+
+// ─── ASSUMED VALUES ───────────────────────────────────────────────────────────
+function applyDefaults(inp) {
+  const assumptions = [];
+  if (!inp.budget) { inp.budget = 'medium'; assumptions.push('Budget Range → Medium (standard assumption)'); }
+  if (!inp.vastu)  { inp.vastu  = 'no';     assumptions.push('Vastu Compliance → No (not specified)'); }
+  if (!inp.parking){ inp.parking= 'yes';    assumptions.push('Parking Requirement → Yes (standard assumption)'); }
+  return assumptions;
+}
+
+// ─── SITE ANALYSIS ────────────────────────────────────────────────────────────
+function computeSite(inp) {
+  const plotArea = inp.width * inp.length;
+  const plotAreaSqft = plotArea * 10.764;
+  // Setbacks: commercial gets larger setbacks
+  const isComm = inp.type === 'commercial';
+  const floorFactor = Math.min(inp.floors, 5);
+  const front  = isComm ? 4 + floorFactor*0.3 : 2 + floorFactor*0.2;
+  const rear   = isComm ? 3 + floorFactor*0.2 : 1.5 + floorFactor*0.15;
+  const side   = isComm ? 2.5 + floorFactor*0.2 : 1 + floorFactor*0.1;
+  const bw = Math.max(0, inp.width  - side*2);
+  const bl = Math.max(0, inp.length - front - rear);
+  const builtUpPerFloor = bw * bl;
+  const totalBuiltUp = builtUpPerFloor * inp.floors;
+  const far = totalBuiltUp / plotArea;
+  const utilization = (builtUpPerFloor / plotArea) * 100;
+  // Orientation
+  let orientation = inp.width >= inp.length ? 'East-West (longer axis)' : 'North-South (longer axis)';
+  if (inp.vastu === 'yes') orientation = 'East-facing main entrance (Vastu: East is auspicious)';
+  return { plotArea, plotAreaSqft, front:+front.toFixed(1), rear:+rear.toFixed(1), side:+side.toFixed(1),
+           builtUpPerFloor:+builtUpPerFloor.toFixed(2), totalBuiltUp:+totalBuiltUp.toFixed(2),
+           far:+far.toFixed(2), utilization:+utilization.toFixed(1), orientation, bw:+bw.toFixed(2), bl:+bl.toFixed(2) };
+}
+
+// ─── FLOOR PLAN ───────────────────────────────────────────────────────────────
+function generateFloorPlans(inp, site) {
+  const isComm = inp.type === 'commercial';
+  const vastu  = inp.vastu === 'yes';
+  const parking = inp.parking === 'yes';
+  const floors = [];
+
+  for (let f = 1; f <= inp.floors; f++) {
+    const isGround = f === 1;
+    const rooms = [];
+
+    if (isComm) {
+      // Commercial layout
+      if (isGround) {
+        rooms.push({name:'Reception / Lobby',   w:site.bw*0.4, l:site.bl*0.25, zone:'Circulation', door:'S', window:'E,W'});
+        rooms.push({name:'Office Space 1',       w:site.bw*0.55, l:site.bl*0.35, zone:'Work Zone',  door:'N', window:'E'});
+        rooms.push({name:'Office Space 2',       w:site.bw*0.55, l:site.bl*0.35, zone:'Work Zone',  door:'N', window:'W'});
+        rooms.push({name:'Toilet Block',         w:site.bw*0.2,  l:site.bl*0.15, zone:'Service',    door:'N', window:'N'});
+        if (parking) rooms.push({name:'Parking Area',  w:Math.max(5,site.bw*0.3), l:Math.max(5,site.bl*0.2), zone:'Parking', door:'S', window:'-'});
+        if (inp.floors > 1) rooms.push({name:'Staircase / Lift', w:2.5, l:4, zone:'Circulation', door:'N', window:'-'});
+      } else {
+        rooms.push({name:'Conference Room',  w:site.bw*0.4, l:site.bl*0.3, zone:'Work Zone',  door:'S', window:'E'});
+        rooms.push({name:'Open Office',      w:site.bw*0.55, l:site.bl*0.5, zone:'Work Zone', door:'N', window:'E,W'});
+        rooms.push({name:'Pantry',           w:site.bw*0.15, l:site.bl*0.12, zone:'Service',  door:'N', window:'N'});
+        rooms.push({name:'Toilet Block',     w:site.bw*0.2,  l:site.bl*0.15, zone:'Service',  door:'N', window:'N'});
+        rooms.push({name:'Staircase / Lift', w:2.5, l:4, zone:'Circulation', door:'N', window:'-'});
+      }
+    } else {
+      // Residential layout with Vastu
+      if (isGround) {
+        rooms.push({name:'Living Room',    w:site.bw*0.45, l:site.bl*0.35, zone:'Living',    door:'E', window:'E,N', vastu:'North-East (Vastu: auspicious)'});
+        rooms.push({name:'Dining Room',    w:site.bw*0.3,  l:site.bl*0.25, zone:'Living',    door:'N', window:'E',   vastu:'West'});
+        rooms.push({name:'Kitchen',        w:site.bw*0.3,  l:site.bl*0.25, zone:'Service',   door:'N', window:'E',   vastu:'South-East (Vastu: fire element)'});
+        rooms.push({name:'Toilet / WC',    w:site.bw*0.12, l:site.bl*0.12, zone:'Service',   door:'N', window:'N',   vastu:'North-West'});
+        if (parking) rooms.push({name:'Parking / Garage', w:Math.max(5,site.bw*0.3), l:Math.max(5,site.bl*0.2), zone:'Parking', door:'S', window:'-', vastu:'South-East or North-West'});
+        if (inp.floors > 1) rooms.push({name:'Staircase', w:2.5, l:4, zone:'Circulation', door:'N', window:'-', vastu:'South or West'});
+      } else if (f === 2) {
+        rooms.push({name:'Master Bedroom', w:site.bw*0.4, l:site.bl*0.35, zone:'Sleeping', door:'N', window:'E,S', vastu:'South-West (Vastu: stability)'});
+        rooms.push({name:'Bedroom 2',      w:site.bw*0.3, l:site.bl*0.3,  zone:'Sleeping', door:'N', window:'N',   vastu:'North-West or South'});
+        rooms.push({name:'Bedroom 3',      w:site.bw*0.3, l:site.bl*0.3,  zone:'Sleeping', door:'N', window:'W',   vastu:'South'});
+        rooms.push({name:'Master Bath',    w:site.bw*0.15,l:site.bl*0.15, zone:'Service',  door:'N', window:'N',   vastu:'North-West'});
+        rooms.push({name:'Common Bath',    w:site.bw*0.12,l:site.bl*0.12, zone:'Service',  door:'N', window:'N',   vastu:'North-West'});
+        rooms.push({name:'Staircase',      w:2.5, l:4, zone:'Circulation', door:'N', window:'-', vastu:'South or West'});
+      } else {
+        rooms.push({name:'Bedroom '+(f+1),  w:site.bw*0.35, l:site.bl*0.3, zone:'Sleeping', door:'N', window:'E', vastu:'South'});
+        rooms.push({name:'Study / Lounge',  w:site.bw*0.35, l:site.bl*0.3, zone:'Living',   door:'N', window:'N', vastu:'North-East'});
+        rooms.push({name:'Bathroom',        w:site.bw*0.15, l:site.bl*0.15,zone:'Service',  door:'N', window:'N', vastu:'North-West'});
+        rooms.push({name:'Terrace / Balcony',w:site.bw*0.4, l:site.bl*0.2, zone:'Outdoor',  door:'E', window:'-', vastu:'North or East'});
+        rooms.push({name:'Staircase',       w:2.5, l:4, zone:'Circulation', door:'N', window:'-', vastu:'South'});
+      }
+    }
+
+    // Compute areas
+    rooms.forEach(r => { r.w=+r.w.toFixed(2); r.l=+r.l.toFixed(2); r.area=+(r.w*r.l).toFixed(2); });
+    floors.push({ floor: f, label: f===1?'Ground Floor':(f===2?'First Floor':(f===3?'Second Floor':'Floor '+f)), rooms });
+  }
+  return floors;
+}
+
+// ─── ASCII FLOOR PLAN ─────────────────────────────────────────────────────────
+function renderASCII(floorData, site) {
+  const W = 60, H = 22;
+  const grid = Array.from({length:H}, ()=>Array(W).fill(' '));
+  const draw = (r,c,h,w,label,door,win) => {
+    for(let i=r;i<r+h&&i<H;i++) for(let j=c;j<c+w&&j<W;j++) {
+      if(i===r||i===r+h-1) grid[i][j]='-';
+      else if(j===c||j===c+w-1) grid[i][j]='|';
+      else grid[i][j]=' ';
+    }
+    // label
+    const lbl = label.substring(0,w-2);
+    const lr = r+Math.floor(h/2), lc = c+Math.floor((w-lbl.length)/2);
+    for(let k=0;k<lbl.length&&lc+k<W;k++) grid[lr][lc+k]=lbl[k];
+    // door
+    if(door&&door!=='-'&&r+h-1<H) grid[r+h-1][c+Math.floor(w/2)]='D';
+    // window
+    if(win&&win!=='-'&&r<H) grid[r][c+Math.floor(w/3)]='W';
+  };
+
+  const rooms = floorData.rooms;
+  const cols = Math.ceil(Math.sqrt(rooms.length));
+  const cellW = Math.floor((W-2)/cols);
+  const cellH = Math.floor((H-2)/Math.ceil(rooms.length/cols));
+
+  rooms.forEach((rm,i) => {
+    const row = Math.floor(i/cols), col = i%cols;
+    draw(1+row*cellH, 1+col*cellW, cellH, cellW, rm.name, rm.door, rm.window);
+  });
+
+  // border
+  for(let j=0;j<W;j++){grid[0][j]='=';grid[H-1][j]='=';}
+  for(let i=0;i<H;i++){grid[i][0]='‖';grid[i][W-1]='‖';}
+
+  return grid.map(r=>r.join('')).join('\n');
+}
+
+// ─── BUILDING SKETCH ──────────────────────────────────────────────────────────
+function buildingSketch(inp, site) {
+  const floorH = 3.0;
+  const totalH = inp.floors * floorH + 1.5; // +parapet/roof
+  const W = 50;
+  const lines = [];
+  // Roof
+  lines.push('       /\\' + ' '.repeat(W-16) + '/\\');
+  lines.push('      /  \\' + '_'.repeat(W-18) + '/  \\');
+  lines.push('     /    ' + ' '.repeat(W-18) + '    \\');
+  for(let f=inp.floors;f>=1;f--) {
+    const lbl = f===1?'Ground Floor':(f===2?'1st Floor':(f===3?'2nd Floor':'Floor '+f));
+    lines.push('    |' + ' [W] '.repeat(3) + '  ' + lbl.padEnd(12) + ' '.repeat(Math.max(0,W-30)) + '|');
+    lines.push('    |' + '-'.repeat(W-8) + '|');
+  }
+  lines.push('    |' + '='.repeat(W-8) + '|  ← Foundation');
+  lines.push('    ' + '~'.repeat(W-4) + '  ← Ground Level');
+  const desc = [
+    `Building Type: ${inp.type.charAt(0).toUpperCase()+inp.type.slice(1)}`,
+    `Overall Dimensions: ${inp.width}m (W) × ${inp.length}m (D) × ${totalH.toFixed(1)}m (H)`,
+    `Number of Floors: ${inp.floors}`,
+    `Roof Type: ${inp.floors > 3 ? 'Flat RCC Roof with parapet' : 'Sloped/Gable Roof with RCC slab'}`,
+    `Orientation: ${site.orientation}`,
+    `Massing: Compact rectangular form with ${inp.floors > 2 ? 'vertical emphasis' : 'horizontal spread'}`,
+    `Key Features: ${inp.vastu==='yes'?'Vastu-compliant layout, ':''}${inp.parking==='yes'?'Dedicated parking, ':''}${inp.floors>1?'Internal staircase, ':''}Natural ventilation through cross-ventilation design`
+  ];
+  return { ascii: lines.join('\n'), desc };
+}
+
+// ─── ELEVATION CONCEPT ────────────────────────────────────────────────────────
+function elevationConcept(inp, site, budget) {
+  const isComm = inp.type === 'commercial';
+  const styles = {
+    low:    { style:'Simple Modern', facade:'Cement plaster with texture paint', cladding:'Ceramic tiles on plinth', windows:'Standard aluminium sliding windows', doors:'Flush doors with laminate finish', roof:'Flat RCC with waterproofing membrane', roofMat:'Bituminous waterproofing', drainage:'Internal RCC drain pipes' },
+    medium: { style:'Contemporary Modern', facade:'Textured plaster + partial stone cladding', cladding:'Granite/Kota stone on plinth', windows:'UPVC casement windows with tinted glass', doors:'Engineered wood doors with veneer finish', roof:'Flat RCC with parapet + terrace garden option', roofMat:'APP membrane waterproofing', drainage:'External RCC drain pipes with rainwater harvesting' },
+    high:   { style:'Premium Modern / Minimalist', facade:'Glass curtain wall + aluminium composite panels', cladding:'Natural stone / vitrified tile cladding', windows:'Double-glazed aluminium curtain wall system', doors:'Solid wood / glass pivot doors', roof:'Green roof / flat RCC with solar panel provision', roofMat:'PU-based waterproofing + insulation board', drainage:'Concealed stainless steel drainage with RWH system' },
+  };
+  const s = styles[budget] || styles.medium;
+  const extMat = isComm
+    ? ['Structural glazing', 'Aluminium composite panels', 'Exposed concrete columns', 'Signage band at parapet']
+    : ['Textured exterior paint', 'Stone/tile cladding at base', 'Decorative grille at windows', 'Planter boxes at balcony'];
+  return { ...s, extMat, location: inp.location };
+}
+
+// ─── STRUCTURAL DESIGN ────────────────────────────────────────────────────────
+function structuralDesign(inp, site) {
+  const area = site.plotArea;
+  const floors = inp.floors;
+  const isComm = inp.type === 'commercial';
+
+  let foundation, colSize, colSpacing, beamDepth, slabThk, slabType;
+
+  if (floors <= 2 && area < 200) {
+    foundation = 'Isolated Footing (RCC) — suitable for light loads on medium soil';
+  } else if (floors <= 4 || area < 500) {
+    foundation = 'Combined / Strip Footing (RCC) — recommended for moderate loads';
+  } else if (floors <= 8) {
+    foundation = 'Raft Foundation (RCC) — recommended for heavy loads and soft soil';
+  } else {
+    foundation = 'Pile Foundation (RCC bored piles) — required for high-rise or poor soil conditions';
+  }
+
+  colSize = floors <= 2 ? '230mm × 300mm' : floors <= 5 ? '300mm × 400mm' : '400mm × 500mm';
+  colSpacing = isComm ? '4.5m – 6m c/c (open plan)' : '3m – 4.5m c/c (room-based grid)';
+  beamDepth = floors <= 2 ? '230mm × 350mm' : floors <= 5 ? '300mm × 450mm' : '350mm × 550mm';
+  slabThk = floors <= 3 ? '125mm' : floors <= 6 ? '150mm' : '175mm';
+  slabType = isComm && floors > 4 ? 'Flat Slab (post-tensioned)' : 'Conventional Two-Way RCC Slab';
+
+  return { foundation, colSize, colSpacing, beamDepth, slabThk, slabType,
+    soilNote: 'Assumed soil bearing capacity: 150 kN/m² (medium hard soil). A geotechnical investigation report must be obtained before actual construction.',
+    grade: floors <= 3 ? 'M20 concrete, Fe415 steel' : floors <= 7 ? 'M25 concrete, Fe500 steel' : 'M30 concrete, Fe500D steel'
+  };
+}
+
+// ─── COST ESTIMATION ─────────────────────────────────────────────────────────
+function costEstimation(inp, site, currency, userBudget) {
+  const builtUpSqft = site.totalBuiltUp * 10.764;
+  const rates = getCostRates(currency.sym);
+
+  const categories = [
+    {name:'Site Preparation',    pct:{low:0.03,med:0.03,high:0.03}},
+    {name:'Foundation',          pct:{low:0.12,med:0.12,high:0.11}},
+    {name:'Structure (RCC)',     pct:{low:0.22,med:0.22,high:0.20}},
+    {name:'Masonry / Brickwork', pct:{low:0.10,med:0.09,high:0.08}},
+    {name:'Roofing',             pct:{low:0.05,med:0.05,high:0.06}},
+    {name:'Flooring',            pct:{low:0.07,med:0.08,high:0.10}},
+    {name:'Doors & Windows',     pct:{low:0.06,med:0.07,high:0.09}},
+    {name:'Plumbing',            pct:{low:0.06,med:0.07,high:0.07}},
+    {name:'Electrical',          pct:{low:0.06,med:0.07,high:0.08}},
+    {name:'Finishing (Plaster/Paint)', pct:{low:0.08,med:0.08,high:0.08}},
+    {name:'Contingency (5%)',    pct:{low:0.05,med:0.05,high:0.05}},
+  ];
+
+  const tiers = ['low','med','high'];
+  const result = {};
+  tiers.forEach(t => {
+    const rateKey = t === 'med' ? 'med' : t;
+    const totalCost = builtUpSqft * rates[rateKey];
+    const items = categories.map(c => ({
+      name: c.name,
+      pct: (c.pct[t==='med'?'med':t]*100).toFixed(0)+'%',
+      amount: totalCost * c.pct[t==='med'?'med':t]
+    }));
+    result[t] = { totalCost, costPerSqft: rates[rateKey], items };
+  });
+
+  // Determine recommended tier
+  let recommended = userBudget === 'low' ? 'low' : userBudget === 'high' ? 'high' : 'med';
+
+  return { tiers: result, recommended, builtUpSqft: +builtUpSqft.toFixed(0), currency };
+}
+
+// ─── INTERIOR DESIGN ─────────────────────────────────────────────────────────
+function interiorDesign(floors, budget) {
+  const schemes = {
+    low:    { palette: ['Ivory White','Off-White','Beige'], fixtures: 'Standard LED downlights', furniture: 'Basic modular furniture' },
+    medium: { palette: ['Warm Grey','Cream','Sage Green'], fixtures: 'Recessed LED + pendant lights', furniture: 'Mid-range modular + upholstered pieces' },
+    high:   { palette: ['Charcoal','Warm White','Terracotta'], fixtures: 'Designer pendants + cove lighting + accent spots', furniture: 'Premium custom furniture + imported pieces' },
+  };
+  const s = schemes[budget] || schemes.medium;
+
+  const roomDesigns = {
+    'Living Room':     { furniture:'3-seater sofa against south wall, coffee table centre, TV unit on east wall, 2 accent chairs', wall:'Warm Grey', ceiling:'White', accent:'Terracotta', lighting:'Ambient: recessed downlights; Accent: wall sconces; Task: floor lamp near reading chair' },
+    'Dining Room':     { furniture:'6-seater dining table centre, buffet unit on west wall, bar cabinet in corner', wall:'Cream', ceiling:'White', accent:'Sage Green', lighting:'Ambient: pendant chandelier over table; Task: under-cabinet lights' },
+    'Kitchen':         { furniture:'L-shaped modular kitchen along east & south walls, island counter if space permits, overhead cabinets', wall:'Ivory White (tiles)', ceiling:'White', accent:'Stainless Steel', lighting:'Ambient: tube lights; Task: under-cabinet LED strips' },
+    'Master Bedroom':  { furniture:'King bed against south-west wall (Vastu), 2 bedside tables, wardrobe on west wall, dressing table on north', wall:'Warm Grey', ceiling:'White', accent:'Gold/Beige', lighting:'Ambient: recessed downlights; Accent: bedside wall sconces; Task: vanity mirror lights' },
+    'Bedroom 2':       { furniture:'Queen bed against south wall, wardrobe on west wall, study desk near window', wall:'Soft Blue', ceiling:'White', accent:'White', lighting:'Ambient: ceiling fan with light; Task: desk lamp' },
+    'Bedroom 3':       { furniture:'Single/Queen bed, wardrobe, study table near window', wall:'Mint Green', ceiling:'White', accent:'White', lighting:'Ambient: ceiling fan with light; Task: desk lamp' },
+    'Master Bath':     { furniture:'Vanity unit, wall-hung WC, shower enclosure, bathtub (medium/high budget)', wall:'White Marble tiles', ceiling:'White', accent:'Chrome', lighting:'Ambient: recessed downlights; Task: vanity mirror lights' },
+    'Common Bath':     { furniture:'Pedestal basin, WC, shower area with curtain', wall:'White ceramic tiles', ceiling:'White', accent:'Chrome', lighting:'Ambient: ceiling light; Task: mirror light' },
+    'Toilet / WC':     { furniture:'WC, wash basin, mirror', wall:'White tiles', ceiling:'White', accent:'Chrome', lighting:'Single ceiling light' },
+    'Conference Room': { furniture:'8-10 seater conference table, executive chairs, projector screen on north wall, whiteboard', wall:'Corporate Blue', ceiling:'White', accent:'Grey', lighting:'Ambient: recessed downlights; Task: table task lights; Accent: wall wash' },
+    'Open Office':     { furniture:'Workstation clusters of 4, manager cabin in corner, storage pedestals', wall:'Light Grey', ceiling:'Exposed/White', accent:'Brand Color', lighting:'Ambient: linear LED panels; Task: desk lamps' },
+    'Reception / Lobby':{ furniture:'Reception desk, 4-seater waiting sofa, coffee table, company signage wall', wall:'White + feature wall', ceiling:'False ceiling with cove', accent:'Brand Color', lighting:'Ambient: recessed; Accent: cove + spot on logo wall' },
+    'Study / Lounge':  { furniture:'L-shaped desk, bookshelf on wall, 2-seater sofa, bean bag', wall:'Warm White', ceiling:'White', accent:'Wood tones', lighting:'Ambient: ceiling light; Task: desk lamp; Accent: shelf lights' },
+    'Pantry':          { furniture:'Counter with sink, overhead cabinets, microwave shelf, mini fridge space', wall:'White tiles', ceiling:'White', accent:'Steel', lighting:'Ambient: tube light; Task: under-cabinet LED' },
+  };
+
+  const result = [];
+  floors.forEach(fp => {
+    fp.rooms.forEach(rm => {
+      const d = roomDesigns[rm.name] || {
+        furniture: 'Functional furniture as per room use',
+        wall: s.palette[0], ceiling: 'White', accent: s.palette[1],
+        lighting: s.fixtures
+      };
+      result.push({ floor: fp.label, room: rm.name, area: rm.area, ...d });
+    });
+  });
+  return result;
+}
+
+// ─── BOQ ─────────────────────────────────────────────────────────────────────
+function computeBOQ(site, inp, currency) {
+  const builtUpSqm = site.totalBuiltUp;
+  const builtUpSqft = builtUpSqm * 10.764;
+  const rates = getCostRates(currency.sym);
+
+  // Standard construction ratios per sqm of built-up area
+  const ratios = {
+    cement:    {qty: builtUpSqm * 0.4,  unit:'bags (50kg)', low:0.85, med:0.9,  high:0.95},
+    steel:     {qty: builtUpSqm * 4.5,  unit:'kg',          low:0.55, med:0.65, high:0.75},
+    bricks:    {qty: builtUpSqm * 500,  unit:'nos',         low:0.006,med:0.007,high:0.008},
+    sand:      {qty: builtUpSqm * 0.6,  unit:'m³',          low:0.7,  med:0.8,  high:0.9},
+    aggregate: {qty: builtUpSqm * 0.45, unit:'m³',          low:0.6,  med:0.7,  high:0.8},
+    tiles:     {qty: builtUpSqm * 1.1,  unit:'m²',          low:0.4,  med:0.7,  high:1.2},
+    paint:     {qty: builtUpSqm * 0.35, unit:'litres',      low:0.15, med:0.2,  high:0.3},
+    plumbing:  {qty: Math.ceil(builtUpSqm/30), unit:'fixture sets', low:3000, med:6000, high:12000},
+  };
+
+  // Currency multiplier vs INR
+  const mults = {'₹':1,'$':0.012,'£':0.0095,'AED ':0.044,'A$':0.018};
+  const mult = mults[currency.sym] || 1;
+
+  const tiers = ['low','med','high'];
+  const result = {};
+  tiers.forEach(t => {
+    let grand = 0;
+    const items = Object.entries(ratios).map(([key, r]) => {
+      const qty = +r.qty.toFixed(1);
+      const unitCost = r[t] * mult * (t==='low'?1:t==='med'?1:1);
+      const total = qty * unitCost;
+      grand += total;
+      return { material: key.charAt(0).toUpperCase()+key.slice(1), qty, unit: r.unit, unitCost: +unitCost.toFixed(2), total: +total.toFixed(0) };
+    });
+    result[t] = { items, grand: +grand.toFixed(0) };
+  });
+  return result;
+}
+
+// ─── TIMELINE ─────────────────────────────────────────────────────────────────
+function constructionTimeline(inp, site) {
+  const builtUpSqm = site.totalBuiltUp;
+  const scale = Math.max(1, builtUpSqm / 100);
+  const f = inp.floors;
+
+  const phases = [
+    {name:'Site Preparation',    base:1,  floorMult:0.2},
+    {name:'Foundation',          base:2,  floorMult:0.5},
+    {name:'Structure (RCC)',     base:3,  floorMult:1.0},
+    {name:'Masonry',             base:2,  floorMult:0.8},
+    {name:'Roofing',             base:1,  floorMult:0.3},
+    {name:'MEP Rough-in',        base:2,  floorMult:0.5},
+    {name:'Finishing',           base:3,  floorMult:0.7},
+    {name:'Handover & Snag',     base:1,  floorMult:0.2},
+  ];
+
+  let cumulative = 0;
+  return phases.map(p => {
+    const weeks = Math.max(1, Math.round((p.base + p.floorMult * f) * Math.sqrt(scale)));
+    const start = cumulative + 1;
+    cumulative += weeks;
+    return { name: p.name, weeks, start, end: cumulative };
+  });
+}
+
+// ─── OPTIMIZATION ─────────────────────────────────────────────────────────────
+function optimizationSuggestions(inp, site, budget) {
+  const vastu = inp.vastu === 'yes';
+  const suggestions = [
+    {cat:'Cost',   text:'Use AAC (Autoclaved Aerated Concrete) blocks instead of traditional bricks', benefit:'Reduces masonry cost by 10–15% and improves thermal insulation'},
+    {cat:'Cost',   text:'Opt for ready-mix concrete (RMC) for structural elements', benefit:'Reduces wastage by 8–12% and improves quality consistency'},
+    {cat:'Cost',   text:'Standardise door and window sizes to reduce custom fabrication costs', benefit:'Saves 5–8% on joinery costs'},
+    {cat:'Space',  text:'Use open-plan living-dining layout on ground floor', benefit:'Saves approximately 8–12 sqft of circulation area and improves spatial flow'},
+    {cat:'Space',  text:'Install built-in wardrobes and under-stair storage', benefit:'Recovers 15–20 sqft of usable storage space'},
+    {cat:'Space',  text:'Use mezzanine level in double-height spaces for additional floor area', benefit:'Adds 20–30% extra usable area at 40% of full floor cost'},
+    {cat:'Energy', text:'Orient main glazing towards North (India) to reduce solar heat gain', benefit:'Reduces cooling load by 15–20%, saving on AC energy costs'},
+    {cat:'Energy', text:'Install solar panels on roof (min 2kW system)', benefit:'Offsets 30–50% of electricity consumption; ROI in 5–7 years'},
+    {cat:'Energy', text:'Use double-glazed UPVC windows for thermal insulation', benefit:'Reduces heat transfer by 40%, lowering HVAC costs by 10–15%'},
+    {cat:'Energy', text:'Incorporate rainwater harvesting system', benefit:'Reduces municipal water dependency by 20–30%'},
+    {cat:'Cost',   text:'Phase construction in stages — structure first, finishing later', benefit:'Improves cash flow management and allows design refinement'},
+  ];
+
+  // Filter out Vastu-conflicting suggestions if Vastu enabled
+  const filtered = vastu
+    ? suggestions.filter(s => !s.text.includes('Orient main glazing towards North'))
+    : suggestions;
+
+  // Add Vastu-specific if enabled
+  if (vastu) {
+    filtered.push({cat:'Space', text:'Place Pooja room in North-East corner as per Vastu', benefit:'Maximises positive energy flow; no structural cost impact'});
+  }
+
+  return filtered.slice(0, Math.max(6, filtered.length));
+}
+
+// ─── RENDER FUNCTIONS ─────────────────────────────────────────────────────────
+function renderSite(site, inp) {
+  $('body-site').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-box"><div class="val">${fmt(site.plotArea,1)} m²</div><div class="lbl">Total Plot Area</div></div>
+      <div class="stat-box"><div class="val">${fmt(site.plotAreaSqft,0)} sqft</div><div class="lbl">Total Plot Area</div></div>
+      <div class="stat-box"><div class="val">${fmt(site.builtUpPerFloor,1)} m²</div><div class="lbl">Built-up Area / Floor</div></div>
+      <div class="stat-box"><div class="val">${fmt(site.totalBuiltUp,1)} m²</div><div class="lbl">Total Built-up Area</div></div>
+      <div class="stat-box"><div class="val">${site.far}</div><div class="lbl">FAR (Floor Area Ratio)</div></div>
+      <div class="stat-box"><div class="val">${site.utilization}%</div><div class="lbl">Plot Utilization</div></div>
+    </div>
+    <table style="margin-top:16px">
+      <tr><th>Parameter</th><th>Value</th></tr>
+      <tr><td>Front Setback</td><td>${site.front} m</td></tr>
+      <tr><td>Rear Setback</td><td>${site.rear} m</td></tr>
+      <tr><td>Side Setbacks (each)</td><td>${site.side} m</td></tr>
+      <tr><td>Net Building Footprint</td><td>${site.bw} m × ${site.bl} m</td></tr>
+      <tr><td>Recommended Orientation</td><td>${site.orientation}</td></tr>
+      <tr><td>Building Type</td><td>${inp.type.charAt(0).toUpperCase()+inp.type.slice(1)}</td></tr>
+      <tr><td>Number of Floors</td><td>${inp.floors}</td></tr>
+    </table>`;
+}
+
+function renderFloors(floorPlans, site) {
+  let html = '';
+  floorPlans.forEach(fp => {
+    html += `<h3 style="color:var(--primary);margin:16px 0 8px">${fp.label}</h3>`;
+    html += `<table><tr><th>Room</th><th>Width (m)</th><th>Length (m)</th><th>Area (m²)</th><th>Zone</th><th>Door</th><th>Window</th>${fp.rooms[0].vastu?'<th>Vastu Position</th>':''}</tr>`;
+    fp.rooms.forEach(r => {
+      html += `<tr><td>${r.name}</td><td>${r.w}</td><td>${r.l}</td><td>${r.area}</td><td>${r.zone}</td><td>${r.door}</td><td>${r.window}</td>${r.vastu?`<td>${r.vastu}</td>`:''}</tr>`;
+    });
+    html += '</table>';
+    html += `<div class="ascii-box">${renderASCII(fp, site)}</div>`;
+    html += `<p style="font-size:0.75rem;color:var(--muted);margin-top:4px">Legend: D=Door, W=Window, ‖=Wall, ==Floor boundary</p>`;
+  });
+  $('body-floor').innerHTML = html;
+}
+
+function renderSketch(sketch) {
+  $('body-sketch').innerHTML = `
+    <div class="ascii-box">${sketch.ascii}</div>
+    <div class="cards-grid" style="margin-top:14px">
+      ${sketch.desc.map(d=>`<div style="padding:8px;border-left:3px solid var(--accent);font-size:0.85rem">${d}</div>`).join('')}
+    </div>`;
+}
+
+function renderElevation(elev) {
+  $('body-elevation').innerHTML = `
+    <div class="cards-grid">
+      <div class="card"><h4>Architectural Style</h4><p>${elev.style}</p></div>
+      <div class="card"><h4>Facade Treatment</h4><p>${elev.facade}</p></div>
+      <div class="card"><h4>Plinth Cladding</h4><p>${elev.cladding}</p></div>
+      <div class="card"><h4>Windows</h4><p>${elev.windows}</p></div>
+      <div class="card"><h4>Doors</h4><p>${elev.doors}</p></div>
+      <div class="card"><h4>Roof Design</h4><p>${elev.roof}</p></div>
+      <div class="card"><h4>Roof Waterproofing</h4><p>${elev.roofMat}</p></div>
+      <div class="card"><h4>Drainage System</h4><p>${elev.drainage}</p></div>
+    </div>
+    <div style="margin-top:14px;padding:12px;background:var(--light);border-radius:8px">
+      <strong>Recommended Exterior Materials:</strong>
+      <ul style="padding-left:18px;margin-top:6px;font-size:0.85rem">
+        ${elev.extMat.map(m=>`<li>${m}</li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+function renderStructural(str) {
+  $('body-structural').innerHTML = `
+    <table>
+      <tr><th>Element</th><th>Specification</th></tr>
+      <tr><td>Foundation Type</td><td>${str.foundation}</td></tr>
+      <tr><td>Column Size</td><td>${str.colSize}</td></tr>
+      <tr><td>Column Spacing</td><td>${str.colSpacing}</td></tr>
+      <tr><td>Beam Size (D×B)</td><td>${str.beamDepth}</td></tr>
+      <tr><td>Slab Thickness</td><td>${str.slabThk}</td></tr>
+      <tr><td>Slab Type</td><td>${str.slabType}</td></tr>
+      <tr><td>Concrete & Steel Grade</td><td>${str.grade}</td></tr>
+    </table>
+    <div style="margin-top:12px;padding:10px;background:#fff8e1;border-left:3px solid var(--warn);border-radius:4px;font-size:0.82rem">
+      ⚠️ ${str.soilNote}
+    </div>`;
+}
+
+function renderCost(cost) {
+  const {tiers, recommended, builtUpSqft, currency} = cost;
+  const tierNames = {low:'Low Budget', med:'Medium Budget', high:'High Budget'};
+  const tierKeys = ['low','med','high'];
+  const tierClass = {low:'low',med:'med',high:'high'};
+
+  let tabsHtml = '<div class="tier-tabs">';
+  tierKeys.forEach(t => {
+    const isRec = t === recommended;
+    tabsHtml += `<div class="tier-tab ${tierClass[t]} ${t===recommended?'active':''}" onclick="switchTier('${t}')">${tierNames[t]}${isRec?'<span class="recommended-badge">Recommended</span>':''}</div>`;
+  });
+  tabsHtml += '</div>';
+
+  let panelsHtml = '';
+  tierKeys.forEach(t => {
+    const d = tiers[t];
+    panelsHtml += `<div class="tier-panel ${t===recommended?'active':''}" id="tier-panel-${t}">
+      <div class="stat-grid" style="margin-bottom:14px">
+        <div class="stat-box"><div class="val">${currency.sym}${fmt(d.costPerSqft)}</div><div class="lbl">Cost per sqft</div></div>
+        <div class="stat-box"><div class="val">${currency.sym}${fmt(d.totalCost)}</div><div class="lbl">Total Project Cost</div></div>
+        <div class="stat-box"><div class="val">${fmt(builtUpSqft,0)}</div><div class="lbl">Built-up Area (sqft)</div></div>
+      </div>
+      <table>
+        <tr><th>Category</th><th>%</th><th>Amount (${currency.name})</th></tr>
+        ${d.items.map(i=>`<tr><td>${i.name}</td><td>${i.pct}</td><td>${currency.sym}${fmt(i.amount)}</td></tr>`).join('')}
+        <tr style="font-weight:700;background:#e8f4fd"><td colspan="2">TOTAL</td><td>${currency.sym}${fmt(d.totalCost)}</td></tr>
+      </table>
+    </div>`;
+  });
+
+  $('body-cost').innerHTML = `
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">Cost basis: ${currency.basis}. All figures are indicative estimates only.</p>
+    ${tabsHtml}${panelsHtml}`;
+}
+
+function switchTier(t) {
+  document.querySelectorAll('.tier-tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tier-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll(`.tier-tab.${t}`).forEach(el => el.classList.add('active'));
+  $('tier-panel-'+t).classList.add('active');
+}
+
+function renderInterior(rooms) {
+  let html = '';
+  let lastFloor = '';
+  rooms.forEach(r => {
+    if (r.floor !== lastFloor) {
+      html += `<h3 style="color:var(--primary);margin:16px 0 8px;border-bottom:2px solid var(--accent);padding-bottom:4px">${r.floor}</h3>`;
+      lastFloor = r.floor;
+    }
+    const wallColor = r.wall.split(' ')[0].toLowerCase().replace(/[^a-z]/g,'');
+    const cssColor = {'warmgrey':'#9e9e9e','cream':'#fffdd0','white':'#ffffff','ivory':'#fffff0','softblue':'#87ceeb','mintgreen':'#98ff98','charcoal':'#36454f','beige':'#f5f5dc','grey':'#808080','lightgrey':'#d3d3d3','corporate':'#003366','warmwhite':'#fdf5e6'}[wallColor] || '#e0e0e0';
+    html += `<div class="room-card">
+      <h4>${r.room} <span style="font-weight:400;color:var(--muted);font-size:0.8rem">(${r.area} m²)</span></h4>
+      <div class="room-details">
+        <div><span class="lbl">Furniture Layout</span><br>${r.furniture}</div>
+        <div>
+          <span class="lbl">Color Scheme</span><br>
+          <span class="color-swatch" style="background:${cssColor}"></span>Wall: ${r.wall}<br>
+          <span class="color-swatch" style="background:#fff;border:1px solid #ccc"></span>Ceiling: ${r.ceiling}<br>
+          <span class="color-swatch" style="background:${cssColor};opacity:0.6"></span>Accent: ${r.accent}
+        </div>
+        <div><span class="lbl">Lighting</span><br>${r.lighting}</div>
+      </div>
+    </div>`;
+  });
+  $('body-interior').innerHTML = html;
+}
+
+function renderBOQ(boq, currency, recommended) {
+  const tierNames = {low:'Low Budget', med:'Medium Budget', high:'High Budget'};
+  const tierKeys = ['low','med','high'];
+
+  let tabsHtml = '<div class="tier-tabs">';
+  tierKeys.forEach(t => {
+    tabsHtml += `<div class="tier-tab ${t} ${t===recommended?'active':''}" onclick="switchBOQTier('${t}')">${tierNames[t]}${t===recommended?'<span class="recommended-badge">Recommended</span>':''}</div>`;
+  });
+  tabsHtml += '</div>';
+
+  let panelsHtml = '';
+  tierKeys.forEach(t => {
+    const d = boq[t];
+    panelsHtml += `<div class="tier-panel ${t===recommended?'active':''}" id="boq-panel-${t}">
+      <table>
+        <tr><th>Material</th><th>Quantity</th><th>Unit</th><th>Unit Cost (${currency.name})</th><th>Total (${currency.name})</th></tr>
+        ${d.items.map(i=>`<tr><td>${i.material}</td><td>${fmt(i.qty,1)}</td><td>${i.unit}</td><td>${currency.sym}${fmt(i.unitCost,2)}</td><td>${currency.sym}${fmt(i.total)}</td></tr>`).join('')}
+        <tr style="font-weight:700;background:#e8f4fd"><td colspan="4">BOQ Grand Total</td><td>${currency.sym}${fmt(d.grand)}</td></tr>
+      </table>
+    </div>`;
+  });
+
+  $('body-boq').innerHTML = `
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">⚠️ Quantities are estimates based on standard construction ratios. Must be verified by a licensed engineer before procurement.</p>
+    ${tabsHtml}${panelsHtml}`;
+}
+
+function switchBOQTier(t) {
+  document.querySelectorAll('.tier-tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tier-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll(`.tier-tab.${t}`).forEach(el => el.classList.add('active'));
+  $('boq-panel-'+t) && $('boq-panel-'+t).classList.add('active');
+  $('tier-panel-'+t) && $('tier-panel-'+t).classList.add('active');
+}
+
+function renderTimeline(phases) {
+  const maxWeeks = phases[phases.length-1].end;
+  let html = `<p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px">⚠️ Timeline assumes continuous work with adequate labor and materials. Actual durations depend on site conditions.</p>
+    <div class="timeline">
+    <table style="margin-bottom:16px">
+      <tr><th>Phase</th><th>Duration (weeks)</th><th>Start Week</th><th>End Week</th></tr>
+      ${phases.map(p=>`<tr><td>${p.name}</td><td>${p.weeks}</td><td>${p.start}</td><td>${p.end}</td></tr>`).join('')}
+      <tr style="font-weight:700;background:#e8f4fd"><td>Total Duration</td><td colspan="3">${maxWeeks} weeks (~${(maxWeeks/4.3).toFixed(1)} months)</td></tr>
+    </table>`;
+
+  html += '<div style="margin-top:8px">';
+  phases.forEach(p => {
+    const pct = (p.weeks / maxWeeks * 100).toFixed(1);
+    const left = ((p.start-1) / maxWeeks * 100).toFixed(1);
+    html += `<div class="tl-row">
+      <div class="tl-label">${p.name}</div>
+      <div class="tl-bar-wrap">
+        <div class="tl-bar" style="width:${pct}%;margin-left:${left}%">${p.weeks}w</div>
+      </div>
+      <div class="tl-weeks">Wk ${p.start}–${p.end}</div>
+    </div>`;
+  });
+  html += '</div></div>';
+  $('body-timeline').innerHTML = html;
+}
+
+function renderOptimization(suggestions) {
+  const badgeClass = {Cost:'badge-cost', Space:'badge-space', Energy:'badge-energy'};
+  $('body-optimization').innerHTML = `
+    <ul class="opt-list">
+      ${suggestions.map(s=>`
+        <li>
+          <span class="opt-badge ${badgeClass[s.cat]||'badge-cost'}">${s.cat}</span>
+          <div>
+            <div style="font-size:0.88rem;font-weight:600">${s.text}</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-top:3px">💡 ${s.benefit}</div>
+          </div>
+        </li>`).join('')}
+    </ul>`;
+}
+
+// ─── MAIN GENERATE ────────────────────────────────────────────────────────────
+function generate() {
+  const inp = {
+    width:    parseFloat($('plotWidth').value),
+    length:   parseFloat($('plotLength').value),
+    location: $('location').value.trim(),
+    floors:   parseInt($('floors').value),
+    type:     $('buildingType').value,
+    budget:   $('budget').value,
+    vastu:    $('vastu').value,
+    parking:  $('parking').value,
+  };
+
+  if (!validate(inp)) return;
+
+  const assumptions = applyDefaults(inp);
+
+  // Show assumptions
+  if (assumptions.length) {
+    $('assumptions-banner').style.display = 'block';
+    $('assumptions-list').innerHTML = assumptions.map(a=>`<li>${a}</li>`).join('');
+  } else {
+    $('assumptions-banner').style.display = 'none';
+  }
+  $('disclaimer').style.display = 'block';
+
+  // Compute all modules
+  const currency   = getCurrency(inp.location);
+  const site       = computeSite(inp);
+  const floorPlans = generateFloorPlans(inp, site);
+  const sketch     = buildingSketch(inp, site);
+  const elev       = elevationConcept(inp, site, inp.budget);
+  const structural = structuralDesign(inp, site);
+  const cost       = costEstimation(inp, site, currency, inp.budget);
+  const interior   = interiorDesign(floorPlans, inp.budget);
+  const boq        = computeBOQ(site, inp, currency);
+  const timeline   = constructionTimeline(inp, site);
+  const optim      = optimizationSuggestions(inp, site, inp.budget);
+
+  // Render all sections
+  renderSite(site, inp);
+  renderFloors(floorPlans, site);
+  renderSketch(sketch);
+  renderElevation(elev);
+  renderStructural(structural);
+  renderCost(cost);
+  renderInterior(interior);
+  renderBOQ(boq, currency, inp.budget);
+  renderTimeline(timeline);
+  renderOptimization(optim);
+
+  // Show sections and nav
+  document.querySelectorAll('.section').forEach(s => s.style.display = 'block');
+  $('nav-bar').style.display = 'flex';
+  $('print-btn').style.display = 'block';
+
+  // Scroll to results
+  $('nav-bar').scrollIntoView({behavior:'smooth'});
+}
+
+function resetForm() {
+  ['plotWidth','plotLength','location','floors'].forEach(id => $(id).value = '');
+  $('buildingType').value = '';
+  $('budget').value = '';
+  $('vastu').value = '';
+  $('parking').value = '';
+  clearErrors();
+  document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+  $('nav-bar').style.display = 'none';
+  $('print-btn').style.display = 'none';
+  $('assumptions-banner').style.display = 'none';
+  $('disclaimer').style.display = 'none';
+}
+</script>
+</body>
+</html>
